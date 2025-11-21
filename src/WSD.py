@@ -9,7 +9,6 @@ from transformers import (
 
 from sentence_transformers import SentenceTransformer, CrossEncoder
 from sklearn.metrics.pairwise import cosine_similarity 
-from typing import List, Dict, Tuple, Optional 
 import spacy
 from functools import lru_cache 
 import warnings 
@@ -17,6 +16,7 @@ from itertools import chain
 
 from maps import UD_TO_SIMPLE 
 from html_parse import get_definitions
+from Errors import TargetPositionError
 
 warnings.filterwarnings("ignore")
 
@@ -61,17 +61,17 @@ class WordSenseDisambiguator:
         print("Loaded succesfully")
 
     #------- POS SECTION ----------
-    def get_pos_tag(self, sentence:str, target_position: int) -> str:
+    def get_pos_tag(self, sentence:str, target_position: int) -> tuple[str, str]:
 
         doc = self.nlp(sentence)
         if target_position >= len(doc): # fallback if I calculated bad the position, TO BE FIXED
-            return 'NOUN'
+            raise TargetPositionError("Target position lays outside the range of tokenized sentence")
         tkn = doc[target_position]
 
-        return (tkn.text, self.pos_map[tkn.pos_])
+        return (tkn.lemma_, self.pos_map[tkn.pos_])
 
 
-    def filter_by_pos(self, entries:Dict[str, List[Dict]], target_pos:str) -> List[Dict]:
+    def filter_by_pos(self, entries:dict[str, list[dict]], target_pos:str) -> list[dict]:
         return entries.get(target_pos, list(chain.from_iterable(entries.values())))
 
     #------- BI ENCODER SECTION -------
@@ -80,8 +80,8 @@ class WordSenseDisambiguator:
     def _get_bi_encoder_embedding(self, text:str) -> np.ndarray:
         return self.bi_encoder.encode(text, convert_to_numpy=True)
         
-    def bi_encoder_retrieval(self, sentence:str, entries: List[Dict]
-                             ) -> List[Tuple[Dict, float]]:
+    def bi_encoder_retrieval(self, sentence:str, entries: list[dict]
+                             ) -> list[tuple[dict, float]]:
 
         sentence_emb = self._get_bi_encoder_embedding(sentence)
         definitions = [e['definition'] for e in entries]
@@ -107,7 +107,7 @@ class WordSenseDisambiguator:
     
 
     # ------- CROSS ENCODER SECION ----------
-    def cross_encoder_rerank(self, sentence:str, candidates: List[Tuple[Dict, float]]):
+    def cross_encoder_rerank(self, sentence:str, candidates: list[tuple[dict, float]]):
 
         pairs = [
             [sentence, entry['definition']]
@@ -129,8 +129,8 @@ class WordSenseDisambiguator:
 
     def ensemble_fusion(
             self, 
-            scored_entries: List[Tuple[Dict, float, float]]
-    ) -> List[Dict]:
+            scored_entries: list[tuple[dict, float, float]]
+    ) -> list[dict]:
 
         results = []
 
@@ -155,9 +155,9 @@ class WordSenseDisambiguator:
     def disambiguate(
         self,
         sentence: str,
-        target_position: str,
+        target_position: int,
         verbose: bool = True
-    ) -> List[Dict]:
+    ) -> list[dict]:
 
         if verbose:
             print(f"\n{'-'*50}")
@@ -165,12 +165,15 @@ class WordSenseDisambiguator:
             print(f"Sentence: {sentence}")
             print(f"\n{'-'*50}")
 
-        target_word, pos_tag = self.get_pos_tag(sentence, target_position)
+        lemma, pos_tag = self.get_pos_tag(sentence, target_position)
+        pos_tag:str
+        lemma: str
+
         if verbose:
             print("\tPoS Tag:", pos_tag)
 
-        all_entries: Dict[str, Dict] = get_definitions(target_word)
-        filtered_entries: List[Dict] = wsd.filter_by_pos(all_entries, pos_tag)
+        all_entries: dict[str, list[dict]] = get_definitions(lemma)
+        filtered_entries: list[dict] = self.filter_by_pos(all_entries, pos_tag)
         if verbose:
             print(f"\tThere are {len(filtered_entries)} filtered entries")
 
@@ -188,7 +191,7 @@ class WordSenseDisambiguator:
             print(f"{'-'*50}")
             print("FINAL RESULTS:")
             print(f"{'-'*50}\n")
-            for i, result in enumerate(final_results[0:3], 1):
+            for i, result in enumerate(final_results, 1):
                 print(f"{i}. Score: {result['final_score']:.4f}")
                 print(f"   {result['definition'][:100]}...")
                 print(f"   (Bi: {result['bi_encoder_score']:.3f} | "
@@ -197,11 +200,6 @@ class WordSenseDisambiguator:
                 print()
         
         return final_results
-
-
-    
-    
-
 
 
 

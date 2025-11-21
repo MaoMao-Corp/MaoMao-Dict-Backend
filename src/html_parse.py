@@ -1,4 +1,3 @@
-from pprint import pprint
 import re
 from bs4 import BeautifulSoup
 from maps import stardict, POS_DOBLE, DICT_TO_SIMPLE, POS_SET
@@ -45,7 +44,9 @@ def get_definitions(word:str) -> dict[str, list[dict]]:
         if is_entry(b, p, word):
             if is_new_pos(b, word):
                 try:
-                    pos = p.find("i", style=lambda v: v and "color: #a00" in v).get_text(strip=True).replace("&","&amp;")
+                    pos = p.find("i", 
+                                 style=lambda v: isinstance(v,str) and "color: #a00" in v
+                                 ).get_text(strip=True).replace("&","&amp;")
                 except Exception as e:
                     pos = "unk"
                 if pos in POS_DOBLE: 
@@ -55,7 +56,7 @@ def get_definitions(word:str) -> dict[str, list[dict]]:
                         if p in POS_SET: curr_pos.append(p)
                         else:curr_pos.append(DICT_TO_SIMPLE[p])
 
-                elif pos in POS_SET: current_pos = pos
+                elif pos in POS_SET: curr_pos = pos
 
                 else:   curr_pos = DICT_TO_SIMPLE[pos]
             if type(curr_pos)==list: 
