@@ -16,4 +16,17 @@ Given that English is not my first language, I sometimes struggle to infer the c
 This word disambiguator was created for personal use in mind, to make our daily lives better.
 
 ## General Overview
-For a given word, predicts the part-of-speech and the lemma within its context window and then gives you the most likely definition/s.
+Given a target word and its surrounding context window, the system predicts its part of speech and lemma, then filters out dictionary entries that don't match these attributes. The remaining candidate meanings are passed through a two-stage pipeline:
+
+- **Bi-encoder retrieval**:
+Both the context window and all candidate meanings are embedded using a bi-encoder. Candidates are ranked by similarity, computed via dot product with the context embedding.
+
+- **Cross-encoder reranking**:
+The top candidates from the retrieval stage are then evaluated by a cross-encoder, which provides a more precise ranking.
+
+Finally, the scores from both stages are combined using a fusion ensemble strategy to produce the final ranked list of candidate meanings presented to the user.
+
+## 🚧 Status 🚧
+The project runs successfully and includes a functional CLI, but it is not yet fully integrated with the frontend. We are actively experimenting with alternative models and optimization strategies to reduce computational cost and make the tool accessible to as many users as possible.
+
+Looking forward, we plan to allow users to contribute to model improvement through federated learning, enabling community-driven fine-tuning while preserving privacy.
